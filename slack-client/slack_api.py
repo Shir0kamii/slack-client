@@ -1,26 +1,10 @@
 import os, requests
 
-BASE_URL = "https://slack.com/api/"
-
-class SlackError(Exception):
-    pass
-
-class SlackNo(SlackError):
-    def __init__(self, msg_error):
-        self.msg = msg_error
-
-    def __repr__(self):
-        return repr(self.msg)
-
-class SlackTooManyRequests(SlackError):
-    def __init__(self, time_to_wait):
-        self.time_to_wait = time_to_wait
-
-    def __repr__(self):
-        return ("Too many requests. Wait %d seconds before trying again" \
-                % (self.time_to_wait))
+from slack_exceptions import *
 
 class SlackAPI(object):
+    BASE_URL = "https://slack.com/api/"
+
     def __init__(self, token=None, allow_env_tocken=True):
         if (token != None):
             self.token = token
@@ -30,7 +14,7 @@ class SlackAPI(object):
             raise SlackError("No token")
 
     def _make_request(self, method, parameters):
-        url = BASE_URL + method
+        url = SlackAPI.BASE_URL + method
         parameters['token'] = self.token
 
         response = requests.post(url, data=parameters)
@@ -287,7 +271,7 @@ class SlackAPI(object):
         }
         return self._make_request("im.close", params)
 
-    def im_history(self, channel **parameters):
+    def im_history(self, channel, **parameters):
         parameters.update({
             'channel': channel
         })
