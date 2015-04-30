@@ -24,6 +24,12 @@ class SlackAPI(object):
             raise SlackNo(result['error'])
         return result
 
+    def api_test(self, **parameters):
+        return self._make_request("api.test", parameters)
+
+    def auth_test(self):
+        return self._make_request("auth.test", parameters)
+
     def chat_postMessage(self, channel, text, **parameters):
         parameters.update({
             'channel': channel,
