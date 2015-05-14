@@ -6,9 +6,9 @@ class SlackAPI(object):
     BASE_URL = "https://slack.com/api/"
 
     def __init__(self, token=None, allow_env_tocken=True):
-        if (token != None):
+        if token != None:
             self.token = token
-        elif (allow_env_tocken and "SLACK_TOKEN" in os.environ):
+        elif allow_env_tocken and "SLACK_TOKEN" in os.environ:
             self.token = os.environ["SLACK_TOKEN"]
         else:
             raise SlackError("No token")
@@ -29,49 +29,52 @@ class SlackAPI(object):
         return result
 
     def channel_id(self, channel):
-        if (channel[0] == "#"):
+        channel = channel.lower()
+        if channel.startswith("#"):
             channel = channel[1:]
 
-        if (channel in self._channel_map):
+        if channel in self._channel_map:
             return self._channel_map[channel]
 
         list_channels = self.channels_list()["channels"]
         self._channel_map = {x['name']: x['id'] for x in list_channels}
 
-        if (channel in self._channel_map):
+        if channel in self._channel_map:
             return self._channel_map[channel]
 
     def group_id(self, group):
-        if (group[0] == "#"):
+        group = group.lower()
+        if group.startswith("#"):
             group = group[1:]
 
-        if (group in self._group_map):
+        if group in self._group_map:
             return self._group_map[group]
 
         list_groups = self.groups_list()["groups"]
         self._group_map = {x['name']: x['id'] for x in list_groups}
 
-        if (group in self._group_map):
+        if group in self._group_map:
             return self._group_map[group]
 
     def user_id(self, user):
-        if (user[0] == "@"):
+        user = user.lower()
+        if user.startswith("@"):
             user = user[1:]
 
-        if (user in self._user_map):
+        if user in self._user_map:
             return self._user_map[user]
 
         list_users = self.users_list()["members"]
         self._user_map = {x["name"]: x["id"] for x in list_users}
 
-        if (user in self._user_map):
+        if user in self._user_map:
             return self._user_map[user]
 
     def api_test(self, **parameters):
         return self._make_request("api.test", parameters)
 
     def auth_test(self):
-        return self._make_request("auth.test", parameters)
+        return self._make_request("auth.test", dict())
 
     def chat_postMessage(self, channel, text, **parameters):
         parameters.update({
@@ -81,6 +84,8 @@ class SlackAPI(object):
         return self._make_request("chat.postMessage", parameters)
 
     def chat_delete(self, channel, timestamp):
+        if channel.startswith("#"):
+            channel = self.channel_id(channel)
         params = {
             'channel': channel,
             'ts': timestamp
@@ -88,6 +93,8 @@ class SlackAPI(object):
         return self._make_request("chat.delete", params)
 
     def chat_update(self, channel, timestamp, new_text):
+        if channel.startswith("#"):
+            channel = self.channel_id(channel)
         params = {
             'channel': channel,
             'ts': timestamp,
@@ -96,7 +103,7 @@ class SlackAPI(object):
         return self._make_request("chat.update", params)
 
     def channels_archive(self, channel):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel
@@ -110,7 +117,7 @@ class SlackAPI(object):
         return self._make_request("channels.create", params)
 
     def channels_history(self, channel, **parameters):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         parameters.update({
             'channel': channel
@@ -118,7 +125,7 @@ class SlackAPI(object):
         return self._make_request("channels.history", parameters)
 
     def channels_info(self, channel):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel
@@ -126,9 +133,9 @@ class SlackAPI(object):
         return self._make_request("channels.info", params)
 
     def channels_invite(self, channel, user):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
-        if (user.startswith("@")):
+        if user.startswith("@"):
             user = self.user_id(user)
         params = {
             'channel': channel,
@@ -137,24 +144,24 @@ class SlackAPI(object):
         return self._make_request("channels.invite", params)
 
     def channels_join(self, name):
-        if (channel.startswith("#")):
-            channel = self.channel_id(channel)
         params = {
             'name': name
         }
         return self._make_request("channels.join", params)
 
     def channels_kick(self, channel, user):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
+        if user.startswith("@"):
+            user = self.user_id(user)
         params = {
             'channel': channel,
             'user': user
         }
         return self._make_request("channels.kick", params)
 
-    def channels_leave(self, channel, user):
-        if (channel.startswith("#")):
+    def channels_leave(self, channel):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel
@@ -168,7 +175,7 @@ class SlackAPI(object):
         return self._make_request("channels.list", params)
 
     def channels_mark(self, channel, timestamp):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel,
@@ -177,7 +184,7 @@ class SlackAPI(object):
         return self._make_request("channels.mark", params)
 
     def channels_rename(self, channel, name):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel,
@@ -186,7 +193,7 @@ class SlackAPI(object):
         return self._make_request("channels.rename", params)
 
     def channels_setPurpose(self, channel, purpose):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel,
@@ -195,7 +202,7 @@ class SlackAPI(object):
         return self._make_request("channels.setPurpose", params)
 
     def channels_setTopic(self, channel, topic):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel,
@@ -204,7 +211,7 @@ class SlackAPI(object):
         return self._make_request("channels.setTopic", params)
 
     def channels_unarchive(self, channel):
-        if (channel.startswith("#")):
+        if channel.startswith("#"):
             channel = self.channel_id(channel)
         params = {
             'channel': channel
@@ -233,18 +240,18 @@ class SlackAPI(object):
         return self._make_request("files.upload", parameters)
 
     def groups_archive(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.archive", params)
 
     def groups_close(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.close", params)
 
@@ -255,57 +262,57 @@ class SlackAPI(object):
         return self._make_request("groups.create", params)
 
     def groups_createChild(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.createChild", params)
 
     def groups_archive(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.archive", params)
 
     def groups_history(self, group, **parameters):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         parameters.update({
-            'channel': channel
+            'group': group
         })
         return self._make_request("groups.history", parameters)
 
     def groups_info(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.info", params)
 
     def groups_invite(self, group, user):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'user': user
         }
         return self._make_request("groups.invite", params)
 
     def groups_kick(self, group, user):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'user': user
         }
         return self._make_request("groups.kick", params)
 
     def groups_leave(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
             'channel': channel
@@ -313,62 +320,60 @@ class SlackAPI(object):
         return self._make_request("groups.leave", params)
 
     def groups_list(self, exclude_archived=True):
-        if (group.startswith("#")):
-            group = self.group_id(group)
         params = {
             'exclude_archived': int(exclude_archived)
         }
         return self._make_request("groups.list", params)
 
     def groups_mark(self, group, timestamp):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'ts': timestamp
         }
         return self._make_request("groups.mark", params)
 
     def group_open(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.open", params)
 
     def groups_rename(self, group, name):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'name': name
         }
         return self._make_request("groups.rename", params)
 
     def groups_setPurpose(self, group, purpose):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'purpose': purpose
         }
         return self._make_request("groups.setPurpose", params)
 
     def groups_setTopic(self, group, topic):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel,
+            'group': group,
             'topic': topic
         }
         return self._make_request("groups.setTopic", params)
 
     def groups_unarchive(self, group):
-        if (group.startswith("#")):
+        if group.startswith("#"):
             group = self.group_id(group)
         params = {
-            'channel': channel
+            'group': group
         }
         return self._make_request("groups.unarchive", params)
 
@@ -418,23 +423,23 @@ class SlackAPI(object):
         })
         return self._make_request("search.file", parameters)
 
-    def search_message(self, query, **parameters):
+    def search_messages(self, query, **parameters):
         parameters.update({
             'query': query
         })
-        return self._make_request("search.message", parameters)
+        return self._make_request("search.messages", parameters)
 
     def stars_list(self, **parameters):
         return self._make_request("stars.list", parameters)
 
-    def team_accessLog(self, **parameters):
-        return self._make_request("team.accessLog", parameters)
+    def team_accessLogs(self, **parameters):
+        return self._make_request("team.accessLogs", parameters)
 
     def team_info(self):
         return self._make_request("team.info", dict())
 
     def users_getPresence(self, user):
-        if (user.startswith("@")):
+        if user.startswith("@"):
             user = self.user_id(user)
         parameters = {
             'user': user
@@ -442,7 +447,7 @@ class SlackAPI(object):
         return self._make_request("users.getPresence", parameters)
 
     def users_info(self, user):
-        if (user.startswith("@")):
+        if user.startswith("@"):
             user = self.user_id(user)
         parameters = {
             'user': user
