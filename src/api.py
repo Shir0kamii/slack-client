@@ -25,12 +25,15 @@ class SlackAPI(object):
         parameters['token'] = self.token
 
         response = requests.post(url, data=parameters)
-
+        
         result = response.json()
         if not result['ok']:
             raise SlackNo(result['error'])
 
         return result
+
+    def __call__(self, **kwargs):
+        return self.end(**kwargs)
 
     def end(self, **kwargs):
         target = self._current_target
