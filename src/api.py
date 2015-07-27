@@ -25,11 +25,11 @@ class SlackAPI(object):
                 ("users", "members")):
             self._generate_caching_functions(name, api_subpart)
 
-        for category, prefixe in (
+        for category, prefix in (
                 ("channels", "#"),
                 ("groups", "#"),
                 ("users", "@")):
-            self._generate_id_functions(category, prefixe)
+            self._generate_id_functions(category, prefix)
 
     def _make_request(self, method, parameters):
         url = self.BASE_URL + method
@@ -70,7 +70,7 @@ class SlackAPI(object):
         method = partial(caching, self)
         setattr(self, "_caching_" + name, method)
 
-    def _generate_id_functions(self, category, prefixe):
+    def _generate_id_functions(self, category, prefix):
         cache_name = "_cache_" + category
         caching_function = getattr(self, "_caching_" + category)
 
@@ -78,7 +78,7 @@ class SlackAPI(object):
             if getattr(self, cache_name) is None:
                 caching_function()
 
-            to_search = name.strip(prefixe)
+            to_search = name.strip(prefix)
 
             if to_search in getattr(self, cache_name):
                 return getattr(self, cache_name)[to_search]
