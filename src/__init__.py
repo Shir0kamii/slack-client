@@ -1,3 +1,3 @@
-from api import SlackAPI
+from .api import SlackAPI
 
 __version__ = '0.1.0'

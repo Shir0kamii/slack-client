@@ -1,6 +1,9 @@
-import os, requests
+from functools import partial
 
-from exceptions import SlackError, SlackNo
+import os
+import requests
+
+from .exceptions import SlackError, SlackNo
 
 class SlackAPI(object):
 
@@ -16,9 +19,17 @@ class SlackAPI(object):
         
         self._current_target = str()
 
-        self._channel_map = dict()
-        self._group_map = dict()
-        self._user_map = dict()
+        for name, api_subpart in (
+                ("channels", "channels"),
+                ("groups", "groups"),
+                ("users", "members")):
+            self._generate_caching_functions(name, api_subpart)
+
+        for category, prefixe in (
+                ("channels", "#"),
+                ("groups", "#"),
+                ("users", "@")):
+            self._generate_id_functions(category, prefixe)
 
     def _make_request(self, method, parameters):
         url = self.BASE_URL + method
@@ -46,3 +57,31 @@ class SlackAPI(object):
 
         self._current_target += target_link
         return self
+
+    def _generate_caching_functions(self, name, api_subpart):
+        setattr(self, "_cache_" + name, None)
+
+        def caching(self):
+            list_channels = self._make_request(name + ".list", dict())
+            serialize = lambda obj: (obj['name'], obj['id'])
+            mapping = dict(map(serialize, list_channels[api_subpart]))
+            setattr(self, "_cache_" + name, mapping) 
+        
+        method = partial(caching, self)
+        setattr(self, "_caching_" + name, method)
+
+    def _generate_id_functions(self, category, prefixe):
+        cache_name = "_cache_" + category
+        caching_function = getattr(self, "_caching_" + category)
+
+        def id_function(self, name):
+            if getattr(self, cache_name) is None:
+                caching_function()
+
+            to_search = name.strip(prefixe)
+
+            if to_search in getattr(self, cache_name):
+                return getattr(self, cache_name)[to_search]
+
+        method = partial(id_function, self)
+        setattr(self, category + "_id", method)
