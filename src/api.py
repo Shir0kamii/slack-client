@@ -19,24 +19,18 @@ class SlackAPI(object):
         
         self._current_target = str()
 
-        for name, api_subpart in (
-                ("channels", "channels"),
-                ("groups", "groups"),
-                ("users", "members")):
-            self._generate_caching_functions(name, api_subpart)
-
-        for category, prefix in (
-                ("channels", "#"),
-                ("groups", "#"),
-                ("users", "@")):
-            self._generate_id_functions(category, prefix)
+        for cache_category in (
+                "channels",
+                "groups",
+                "users"):
+            setattr(self, "_cache_" + cache_category, None)
 
     def _make_request(self, method, parameters):
         url = self.BASE_URL + method
         parameters['token'] = self.token
 
         response = requests.post(url, data=parameters)
-        
+
         result = response.json()
         if not result['ok']:
             raise SlackNo(result['error'])
@@ -58,8 +52,8 @@ class SlackAPI(object):
         self._current_target += target_link
         return self
 
-    def _generate_caching_functions(self, name, api_subpart):
-        setattr(self, "_cache_" + name, None)
+    @classmethod
+    def _generate_caching_methods(cls, name, api_subpart):
 
         def caching(self):
             list_channels = self._make_request(name + ".list", dict())
@@ -67,21 +61,33 @@ class SlackAPI(object):
             mapping = dict(map(serialize, list_channels[api_subpart]))
             setattr(self, "_cache_" + name, mapping) 
         
-        method = partial(caching, self)
-        setattr(self, "_caching_" + name, method)
-
-    def _generate_id_functions(self, category, prefix):
+        setattr(cls, "_caching_" + name, caching)
+    
+    @classmethod
+    def _generate_id_methods(cls, category, prefix):
         cache_name = "_cache_" + category
-        caching_function = getattr(self, "_caching_" + category)
+        caching_method = getattr(cls, "_caching_" + category)
 
-        def id_function(self, name):
+        def id_method(self, name):
             if getattr(self, cache_name) is None:
-                caching_function()
+                caching_method(self)
 
             to_search = name.strip(prefix)
 
             if to_search in getattr(self, cache_name):
                 return getattr(self, cache_name)[to_search]
 
-        method = partial(id_function, self)
-        setattr(self, category + "_id", method)
+        setattr(cls, category + "_id", id_method)
+    
+for name, api_subpart in (
+        ("channels", "channels"),
+        ("groups", "groups"),
+        ("users", "members")):
+    SlackAPI._generate_caching_methods(name, api_subpart)
+
+for category, prefix in (
+        ("channels", "#"),
+        ("groups", "#"),
+        ("users", "@")):
+    SlackAPI._generate_id_methods(category, prefix)
+
