@@ -6,10 +6,13 @@ import requests
 from .exceptions import SlackError, SlackNo
 
 class SlackAPI(object):
+    """Main class for manipulation of the API
+
+    Stands as a wrapper for a single token"""
 
     BASE_URL = "https://slack.com/api/"
 
-    def __init__(self, token=None, allow_env_token=True):
+    def __init__(self, token=None, allow_env_token=False):
         if token != None:
             self.token = token
         elif allow_env_token and "SLACK_TOKEN" in os.environ:
