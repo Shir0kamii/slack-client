@@ -3,7 +3,31 @@ import requests
 
 from .exceptions import SlackError, SlackNo
 
-class SlackAPI(object):
+class SlackObject:
+    """The base object for all Slack Objects"""
+
+    _LIST_OBJECTS = dict()
+
+    def __init__(self, identifiant, token=None):
+        """initialize a way to identify each instance"""
+        self.identifiant = identifiant
+        self._LIST_OBJECTS[identifiant] = self
+        if isinstance(token, SlackAPI):
+            self.api = token
+        elif isinstance(token, str):
+            self.api = SlackAPI.get_object(token)
+        else:
+            self.api = None
+
+    @classmethod
+    def get_object(cls, identifiant, token=None):
+        """Return an instance of a class based on its identifiant"""
+        if identifiant in cls._LIST_OBJECTS:
+            return cls._LIST_OBJECTS[identifiant]
+        else:
+            return cls(token, identifiant)
+
+class SlackAPI(SlackObject):
     """Main class for manipulation of the API
 
     Stands as a wrapper for a single token"""
@@ -15,6 +39,7 @@ class SlackAPI(object):
         
         The token can be either given through parameter "token"
         or be read from the environment (when allow_env_token is True)"""
+        super().__init__(token)
         if token != None:
             self.token = token
         elif allow_env_token and "SLACK_TOKEN" in os.environ:
@@ -40,7 +65,7 @@ class SlackAPI(object):
 
         result = response.json()
         if not result['ok']:
-            raise SlackNo(result['error'])
+            raise SlackNo(result['error'], result)
 
         return result
 
