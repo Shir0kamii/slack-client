@@ -1,36 +1,64 @@
 import os
 import requests
 
-from .exceptions import SlackError, SlackNo
+from .exceptions import SlackError, SlackNo, SlackMissingAPI
 
 class SlackObject:
-    """The base object for all Slack Objects"""
+    """The base object for all Slack Objects
+    
+    ### Attributes
 
-    _LIST_OBJECTS = dict()
+    identifiant: UID of the object (unique within a domain name)
+    api: A SlackAPI object
+    """
+
+    _MAP_OBJECTS = dict()
 
     def __init__(self, identifiant, token=None):
-        """initialize a way to identify each instance"""
+        """initialize a way to identify each instance
+        
+        identifiant: The unique ID of the object
+        
+        token: Either a token string or a SlackAPI object
+        can be None only in a SlackAPI initialization
+        """
+
         self.identifiant = identifiant
-        self._LIST_OBJECTS[identifiant] = self
-        if isinstance(token, SlackAPI):
+        self._MAP_OBJECTS[identifiant] = self
+
+        # self.api must be a SlackAPI object
+        # If self is a SlackAPI object, self.api doesn't matter
+        # If the token is a SlackAPI object, use it as api interface
+        # If the token is a string, make a SlackAPI instance out of it
+        # Else, an exception is raised
+        if isinstance(token, SlackAPI) or isinstance(self, SlackAPI):
             self.api = token
         elif isinstance(token, str):
             self.api = SlackAPI.get_object(token)
         else:
-            self.api = None
+            raise SlackMissingAPI
 
     @classmethod
-    def get_object(cls, identifiant, token=None):
-        """Return an instance of a class based on its identifiant"""
-        if identifiant in cls._LIST_OBJECTS:
-            return cls._LIST_OBJECTS[identifiant]
+    def get_instance(cls, identifiant, token=None):
+        """Return an instance of a class based on its identifiant
+        
+        It returns the same object if called with the same identifiant
+        """
+
+        if identifiant in cls._MAP_OBJECTS:
+            return cls._MAP_OBJECTS[identifiant]
         else:
             return cls(token, identifiant)
 
 class SlackAPI(SlackObject):
     """Main class for manipulation of the API
 
-    Stands as a wrapper for a single token"""
+    Stands as a wrapper for a single token
+
+    ### Attributes
+
+    token: token for the Slack web API
+    """
 
     BASE_URL = "https://slack.com/api/"
 
@@ -38,8 +66,13 @@ class SlackAPI(SlackObject):
         """Give you a Wrapper for a token
         
         The token can be either given through parameter "token"
-        or be read from the environment (when allow_env_token is True)"""
+        or be read from the environment (when allow_env_token is True)
+        """
+
+        # Init the object
         super().__init__(token)
+
+        # Try to find a token
         if token != None:
             self.token = token
         elif allow_env_token and "SLACK_TOKEN" in os.environ:
@@ -57,12 +90,16 @@ class SlackAPI(SlackObject):
             setattr(self, "_cache_" + cache_category, None)
 
     def _make_request(self, method, parameters):
-        """Send a request to the SlackAPI"""
-        url = self.BASE_URL + method
-        parameters['token'] = self.token
+        """Send a request to the Slack web API"""
 
+        # Make url
+        url = self.BASE_URL + method
+
+        # Integrate the token in the request and post it
+        parameters['token'] = self.token
         response = requests.post(url, data=parameters)
 
+        # Parse the response, searching for error
         result = response.json()
         if not result['ok']:
             raise SlackNo(result['error'], result)
@@ -71,14 +108,19 @@ class SlackAPI(SlackObject):
 
     def __call__(self, **kwargs):
         """Allow users to call API in the form `api.channels.list()`"""
+
         target = self._current_target
+
+        # Clean the current target
         self._current_target = str()
+
         return self._make_request(target, kwargs)
 
     def __getattr__(self, target_link):
         """Allow to call API in fashion way
 
         It permits to do `api.channels.list()` to call channels.list method"""
+
         if len(self._current_target) > 0:
             self._current_target += '.'
 
@@ -91,17 +133,28 @@ class SlackAPI(SlackObject):
         
         Deleted after use"""
 
-        function_name = "_caching_" + name
+        method_name = "_caching_" + name
 
         def caching(self):
-            list_channels = self._make_request(name + ".list", dict())
+            """set later"""
+
+            # Get the list of objects 
+            list_objects = self._make_request(name + ".list", dict())
+
+            # Fonction to format each object in tuple (<name>, <id>)
             serialize = lambda obj: (obj['name'], obj['id'])
-            mapping = dict(map(serialize, list_channels[api_subpart]))
+
+            # Use the fonction on each objects
+            mapping = dict(map(serialize, list_objects[api_subpart]))
+
+            # Set the cache
             setattr(self, "_cache_" + name, mapping) 
         
+        # Meta attributes of the function
         caching.__doc__ = "Cache {name} in _cache_{name}".format(name=name)
-        caching.__name__ = function_name
+        caching.__name__ = method_name
 
+        # Integrate the function of caching in the class
         setattr(cls, function_name, caching)
     
     @classmethod
@@ -110,15 +163,22 @@ class SlackAPI(SlackObject):
         
         Deleted after use"""
 
+        # Make some preprocessing outside of the generated method
         cache_name = "_cache_" + category
         caching_method = getattr(cls, "_caching_" + category)
 
         def id_method(self, name):
+            """set later"""
+
+            # If the cache doesn't exist, create it
             if getattr(self, cache_name) is None:
                 caching_method(self)
 
+            # Remove the prefix if present
             to_search = name.strip(prefix)
 
+            # Search the object in the cache and return it
+            # If nothing is found, return None
             if to_search in getattr(self, cache_name):
                 return getattr(self, cache_name)[to_search]
 
