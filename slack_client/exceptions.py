@@ -6,3 +6,6 @@ class SlackNo(SlackError):
 
 class SlackMissingAPI(SlackError):
     pass
+
+class SlackNotFound(SlackError):
+    pass
