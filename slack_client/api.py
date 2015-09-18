@@ -57,10 +57,56 @@ class SlackAPI(SlackObject):
 
     ### Attributes
 
+    #### Class attributes
+
+    BASE_URL: The base url of the web slack api
+
+    #### Public instance attributes
+
     token: token for the Slack web API
+
+    #### Private instance attributes
+
+    _cache_channels: a cache for conversion from name to channel
+    
+    _cache_groups: a cache for conversion from name to group
+    
+    _cache_users: a cache for conversion from name to user
+    
+    _cache_ims: a cache for conversion from user to im
+
+    ### Public API
+
+    group_id: Return the id of the group, or None if not found
+    
+    users_id: Return the id of the users, or None if not found
+    
+    channel_id: Return the id of the channel, or None if not found
+
+    im_id: Return the id of the im, or None if not found
+    
+    ### Private API
+
+    _caching_channels: A method to cache channels
+    
+    _caching_groups: A method to cache groups
+    
+    _caching_users: A method to cache users
+    
+    _caching_ims: A method to cache ims
+
+    _userid_to_imid: Conversion from userid to imid
     """
 
+
+    ######## Class attributes #############
+
+
     BASE_URL = "https://slack.com/api/"
+
+
+    ########## Magix methods ############
+
 
     def __init__(self, token=None, allow_env_token=False):
         """Give you a Wrapper for a token
@@ -79,15 +125,42 @@ class SlackAPI(SlackObject):
             self.token = os.environ["SLACK_TOKEN"]
         else:
             raise SlackError("No token")
+
+        # Init caches to None, for them not to be cached by __getattr__
+        for category in ('channels', 'groups', 'users', 'ims'):
+            setattr(self, '_cache_' + category, None)
         
         self._current_target = str()
         
-        # Defaults caches to None
-        for cache_category in (
-                "channels",
-                "groups",
-                "users"):
-            setattr(self, "_cache_" + cache_category, None)
+    def __call__(self, **kwargs):
+        """Allow users to call API in the form `api.channels.list()`"""
+
+        target = self._current_target
+
+        # Clean the current target
+        self._current_target = str()
+
+        return self._make_request(target, kwargs)
+
+
+    def __getattr__(self, target_link):
+        """Allow to call API in fashion way
+
+        It permits to do `api.channels.list()` to call channels.list method"""
+
+        if len(self._current_target) > 0:
+            self._current_target += '.'
+
+        self._current_target += target_link
+        return self
+
+
+    ######## Private API #############
+    # Generated methods :
+    # _caching_channels()
+    # _caching_groups()
+    # _cahcing_users()
+
 
     def _make_request(self, method, parameters):
         """Send a request to the Slack web API"""
@@ -106,26 +179,6 @@ class SlackAPI(SlackObject):
 
         return result
 
-    def __call__(self, **kwargs):
-        """Allow users to call API in the form `api.channels.list()`"""
-
-        target = self._current_target
-
-        # Clean the current target
-        self._current_target = str()
-
-        return self._make_request(target, kwargs)
-
-    def __getattr__(self, target_link):
-        """Allow to call API in fashion way
-
-        It permits to do `api.channels.list()` to call channels.list method"""
-
-        if len(self._current_target) > 0:
-            self._current_target += '.'
-
-        self._current_target += target_link
-        return self
 
     @classmethod
     def _generate_caching_methods(cls, name, api_subpart):
@@ -154,9 +207,10 @@ class SlackAPI(SlackObject):
         caching.__doc__ = "Cache {name} in _cache_{name}".format(name=name)
         caching.__name__ = method_name
 
-        # Integrate the function of caching in the class
-        setattr(cls, function_name, caching)
-    
+        # Integrate the caching method in the class
+        setattr(cls, method_name, caching)
+
+
     @classmethod
     def _generate_id_methods(cls, category, prefix):
         """Special method generating id methods
@@ -186,13 +240,60 @@ class SlackAPI(SlackObject):
                 category=category[:-1]) # Quick hack to remove the trailing s
         id_method.__name__ = "{category}_id".format(category=category)
 
-        setattr(cls, category + "_id", id_method)
+        setattr(cls, category[:-1] + "_id", id_method)
+
+    def _caching_ims(self):
+        """Cache ims in _cache_ims"""
+
+        # Get the list of objects 
+        list_objects = self._make_request("im.list", dict())
+
+        # Fonction to format each object in tuple (<name>, <id>)
+        serialize = lambda obj: (obj['user'], obj['id'])
+
+        # Use the fonction on each objects
+        mapping = dict(map(serialize, list_objects['ims']))
+
+        # Set the cache
+        self._cache_ims = mapping
+
+
+    def _userid_to_imid(self, userid):
+        """Return the im corresponding to the user"""
+
+        # If the cache doesn't exist, create it
+        if getattr(self, '_cache_im') is None:
+            self._caching_ims()
+
+        if userid in self._cache_ims:
+            return self._cache_ims[userid]
+
+
+    ######### Public API ###############
+
+
+    def im_id(self, name):
+        """Retrive im'id corresponding to username"""
+        
+        # If the cache doesn't exist, create it
+        if getattr(self, '_cache_ims') is None:
+            self._caching_ims()
+
+        # Convert name to userid
+        to_search = self.user_id(name)
+
+        # Search the object in the cache and return it
+        # If nothing is found, return None
+        if to_search in self._cache_ims:
+            return self._cache_ims[to_search]
+
 
 # Generate caching methods
 for name, api_subpart in (
         ("channels", "channels"),
         ("groups", "groups"),
-        ("users", "members")):
+        ("users", "members"),
+        ):
     SlackAPI._generate_caching_methods(name, api_subpart)
 
 del SlackAPI._generate_caching_methods
@@ -202,7 +303,8 @@ del SlackAPI._generate_caching_methods
 for category, prefix in (
         ("channels", "#"),
         ("groups", "#"),
-        ("users", "@")):
+        ("users", "@"),
+        ):
     SlackAPI._generate_id_methods(category, prefix)
 
 del SlackAPI._generate_id_methods
