@@ -58,7 +58,7 @@ class SlackDiscussion(SlackObject):
 
 
     def send(self, message, **kwargs):
-        """Send a message on the channel"""
+        """Send a message in the discussion"""
 
         # Default parameters for the request
         params = {
@@ -75,3 +75,23 @@ class SlackDiscussion(SlackObject):
 
         # Return the timestamp of the message, allowing to change it
         return response['ts']
+
+    def update(self, timestamp, updated_text, **kwargs):
+        """Update a message"""
+
+        params = {
+            'channel': self.identifiant,
+            'ts': timestamp,
+            'text': updated_text,
+            'as_user': True,
+        }
+
+        params.update(kwargs)
+
+        response = self.api.chat.update(**params)
+
+        return response['ts']
+
+    def delete(self, timestamp):
+        self.api.chat.delete(channel=self.identifiant, ts=timestamp)
+        
