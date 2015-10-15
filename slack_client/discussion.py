@@ -94,4 +94,8 @@ class SlackDiscussion(SlackObject):
 
     def delete(self, timestamp):
         self.api.chat.delete(channel=self.identifiant, ts=timestamp)
+
+
+    def get_history(self, **kwargs):
+        return self.api.__getattr__(self.category).history(channel=self.identifiant, **kwargs)
         
